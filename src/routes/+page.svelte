@@ -1,31 +1,17 @@
 <script lang="ts">
   import logo from "$lib/assets/logo-kv.png";
-  import ControlBar from "$lib/components/player/ControlBar.svelte";
-  import ProgressBar from "$lib/components/player/ProgressBar.svelte";
+  import PlayerStage from "$lib/components/player/PlayerStage.svelte";
   import { openMediaFile, openMediaFolder } from "$lib/api/media";
-  import { attachMediaElement, detachMediaElement, loadMedia } from "$lib/player/controller";
+  import { loadMedia } from "$lib/player/controller";
   import { installKeyboardShortcuts } from "$lib/player/shortcuts";
   import { activePlaylist, addManyToPlaylist, clearPlaylist } from "$lib/stores/playlist";
-  import {
-    currentMedia,
-    isConverting,
-    playbackError,
-    playbackNotice,
-    playbackSource,
-    playbackStage,
-  } from "$lib/stores/player";
+  import { currentMedia, isConverting, playbackStage } from "$lib/stores/player";
   import { formatFileSize } from "$lib/utils/formatters";
   import type { MediaItem } from "$lib/types/media";
 
   let isLoading = $state(false);
   let importNotice = $state<string | null>(null);
   let importError = $state<string | null>(null);
-  let mediaElement = $state<HTMLMediaElement | null>(null);
-
-  $effect(() => {
-    if (mediaElement) attachMediaElement(mediaElement);
-    return () => detachMediaElement();
-  });
 
   $effect(() => installKeyboardShortcuts());
 
@@ -107,17 +93,7 @@
         {#if $playbackStage === 1}(remuxé){:else if $playbackStage === 2}(converti){/if}
       </p>
 
-      {#if $currentMedia.kind === "video"}
-        <!-- svelte-ignore a11y_media_has_caption -->
-        <video bind:this={mediaElement} src={$playbackSource} autoplay playsinline></video>
-      {:else}
-        <audio bind:this={mediaElement} src={$playbackSource} autoplay></audio>
-      {/if}
-
-      <div class="player-controls">
-        <ProgressBar />
-        <ControlBar />
-      </div>
+      <PlayerStage />
 
       <p class="kbd-hint">
         <kbd>Espace</kbd>/<kbd>K</kbd> lecture · <kbd>←</kbd><kbd>→</kbd> ±10 s ·
@@ -125,16 +101,6 @@
         <kbd>N</kbd>/<kbd>P</kbd> suivant/précédent · <kbd>0</kbd>–<kbd>9</kbd> saut ·
         <kbd>F</kbd> plein écran · <kbd>Échap</kbd> quitter
       </p>
-
-      {#if $isConverting}
-        <p class="notice" role="status">Préparation du média…</p>
-      {/if}
-      {#if $playbackNotice}
-        <p class="notice" role="status">{$playbackNotice}</p>
-      {/if}
-      {#if $playbackError}
-        <p class="error" role="alert">{$playbackError}</p>
-      {/if}
     </section>
   {:else}
     <p class="empty">Sélectionne un fichier ou un dossier pour commencer.</p>
@@ -219,27 +185,6 @@
   button:disabled {
     opacity: 0.5;
     cursor: default;
-  }
-
-  .player video {
-    width: 100%;
-    max-height: min(65vh, 720px);
-    margin-top: 1rem;
-    border-radius: var(--radius-sm);
-    background: #000;
-    object-fit: contain;
-  }
-
-  .player audio {
-    width: 100%;
-    margin-top: 1rem;
-  }
-
-  .player-controls {
-    display: grid;
-    gap: 0.4rem;
-    margin-top: 0.9rem;
-    padding: 0 0.4rem;
   }
 
   .media-title {
