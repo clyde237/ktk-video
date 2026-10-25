@@ -4,6 +4,7 @@
   import ProgressBar from "$lib/components/player/ProgressBar.svelte";
   import { openMediaFile, openMediaFolder } from "$lib/api/media";
   import { attachMediaElement, detachMediaElement, loadMedia } from "$lib/player/controller";
+  import { installKeyboardShortcuts } from "$lib/player/shortcuts";
   import { activePlaylist, addManyToPlaylist, clearPlaylist } from "$lib/stores/playlist";
   import {
     currentMedia,
@@ -25,6 +26,8 @@
     if (mediaElement) attachMediaElement(mediaElement);
     return () => detachMediaElement();
   });
+
+  $effect(() => installKeyboardShortcuts());
 
   async function runImport(action: () => Promise<void>): Promise<void> {
     isLoading = true;
@@ -115,6 +118,13 @@
         <ProgressBar />
         <ControlBar />
       </div>
+
+      <p class="kbd-hint">
+        <kbd>Espace</kbd>/<kbd>K</kbd> lecture · <kbd>←</kbd><kbd>→</kbd> ±10 s ·
+        <kbd>↑</kbd><kbd>↓</kbd> volume · <kbd>M</kbd> muet · <kbd>S</kbd> stop ·
+        <kbd>N</kbd>/<kbd>P</kbd> suivant/précédent · <kbd>0</kbd>–<kbd>9</kbd> saut ·
+        <kbd>F</kbd> plein écran · <kbd>Échap</kbd> quitter
+      </p>
 
       {#if $isConverting}
         <p class="notice" role="status">Préparation du média…</p>
@@ -237,6 +247,26 @@
     color: var(--color-text-muted);
     font-size: 0.95rem;
     overflow-wrap: anywhere;
+  }
+
+  .kbd-hint {
+    margin: 0.75rem 0 0;
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+    line-height: 2;
+  }
+
+  .kbd-hint kbd {
+    display: inline-block;
+    min-width: 1.4em;
+    padding: 0.1em 0.35em;
+    border: 1px solid var(--color-border);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    background: var(--color-surface);
+    font-family: inherit;
+    font-size: 0.95em;
+    text-align: center;
   }
 
   .empty {

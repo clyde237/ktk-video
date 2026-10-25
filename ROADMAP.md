@@ -17,7 +17,7 @@
 
 ## Phase 3 : Interface Utilisateur
 - [x] Créer les composants Svelte pour les contrôles de lecture (barre de progression, boutons play/pause, volume, vitesse de lecture)
-- [ ] Implémenter la gestion des raccourcis clavier pour toutes les actions courantes du lecteur
+- [x] Implémenter la gestion des raccourcis clavier pour toutes les actions courantes du lecteur
 - [ ] Développer le basculement thème clair/sombre en fonction des préférences du système d'exploitation
 - [ ] Construire la fenêtre de lecteur principale avec disparition automatique des contrôles pendant la lecture
 

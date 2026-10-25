@@ -1,6 +1,6 @@
 <script lang="ts">
   import { duration, position } from "$lib/stores/player";
-  import { seekTo } from "$lib/player/controller";
+  import { seekBy, seekTo } from "$lib/player/controller";
 
   let isScrubbing = $state(false);
 
@@ -37,21 +37,37 @@
   }
 
   function handleKeyDown(event: KeyboardEvent): void {
+    const seek = (delta: number) => {
+      event.preventDefault();
+      event.stopPropagation();
+      seekBy(delta);
+    };
+
     if ($duration <= 0) return;
 
-    const step = event.shiftKey ? 30 : 5;
-    if (event.key === "ArrowRight" || event.key === "ArrowUp") {
-      event.preventDefault();
-      seekTo($position + step);
-    } else if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
-      event.preventDefault();
-      seekTo($position - step);
-    } else if (event.key === "Home") {
-      event.preventDefault();
-      seekTo(0);
-    } else if (event.key === "End") {
-      event.preventDefault();
-      seekTo($duration);
+    switch (event.key) {
+      case "ArrowRight":
+        seek(5);
+        break;
+      case "ArrowLeft":
+        seek(-5);
+        break;
+      case "PageUp":
+        seek(30);
+        break;
+      case "PageDown":
+        seek(-30);
+        break;
+      case "Home":
+        event.preventDefault();
+        event.stopPropagation();
+        seekTo(0);
+        break;
+      case "End":
+        event.preventDefault();
+        event.stopPropagation();
+        seekTo($duration);
+        break;
     }
   }
 </script>
