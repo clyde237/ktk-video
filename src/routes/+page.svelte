@@ -3,7 +3,7 @@
   import logo from "$lib/assets/logo-kv.png";
   import PlayerStage from "$lib/components/player/PlayerStage.svelte";
   import PlaylistPanel from "$lib/components/playlist/PlaylistPanel.svelte";
-  import { openMediaFile, openMediaFolder } from "$lib/api/media";
+  import { openMediaFiles, openMediaFolder } from "$lib/api/media";
   import { loadMedia } from "$lib/player/controller";
   import { installKeyboardShortcuts } from "$lib/player/shortcuts";
   import { addManyToPlaylist, initPlaylistStore, playlistStoreReady } from "$lib/stores/playlist";
@@ -34,24 +34,41 @@
     }
   }
 
-  function handleOpenFile(): Promise<void> {
+  function describeImport(added: number, skipped: number): string {
+    const addedPart =
+      added > 0
+        ? `${added} média${added > 1 ? "s" : ""} ajouté${added > 1 ? "s" : ""}`
+        : "Aucun nouveau média";
+    const skippedPart =
+      skipped > 0
+        ? `, ${skipped} ignoré${skipped > 1 ? "s" : ""} (déjà présent${skipped > 1 ? "s" : ""})`
+        : "";
+    return `${addedPart}${skippedPart}.`;
+  }
+
+  function handleOpenFiles(): Promise<void> {
     return runImport(async () => {
-      const media = await openMediaFile();
-      if (media) loadMedia(media);
+      const items = await openMediaFiles();
+      if (items === null || items.length === 0) return;
+
+      const { added, skipped } = addManyToPlaylist(items);
+      importNotice = describeImport(added, skipped);
+
+      if (added > 0) loadMedia(items[0]);
     });
   }
 
   function handleOpenFolder(): Promise<void> {
     return runImport(async () => {
-      const items = await openMediaFolder();
+      const items = await openMediaFolder(true);
       if (items === null) return;
       if (items.length === 0) {
-        importNotice = "Aucun média trouvé dans ce dossier.";
+        importNotice = "Aucun média trouvé dans ce dossier (sous-dossiers inclus).";
         return;
       }
 
-      addManyToPlaylist(items);
-      importNotice = `${items.length} média${items.length > 1 ? "s" : ""} ajouté${items.length > 1 ? "s" : ""} à la playlist.`;
+      const { added, skipped } = addManyToPlaylist(items);
+      importNotice = describeImport(added, skipped);
     });
   }
 
@@ -72,8 +89,12 @@
   </header>
 
   <div class="actions">
-    <button onclick={handleOpenFile} disabled={isLoading || $isConverting || !$playlistStoreReady}>
-      Ouvrir un média
+    <button
+      onclick={handleOpenFiles}
+      disabled={isLoading || $isConverting || !$playlistStoreReady}
+      title="Multi-sélection possible (Ctrl+clic, Maj+clic)"
+    >
+      Importer des fichiers
     </button>
     <button onclick={handleOpenFolder} disabled={isLoading || $isConverting || !$playlistStoreReady}>
       Importer un dossier

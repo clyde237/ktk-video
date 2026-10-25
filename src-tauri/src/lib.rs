@@ -130,14 +130,85 @@ fn media_folder_info(directory: &Path) -> Result<Vec<MediaFileInfo>, String> {
     Ok(items)
 }
 
+fn collect_media_files(
+    dir: &Path,
+    recursive: bool,
+    items: &mut Vec<MediaFileInfo>,
+) -> std::io::Result<()> {
+    for entry in fs::read_dir(dir)? {
+        let Ok(entry) = entry else {
+            continue;
+        };
+
+        let file_path = entry.path();
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+
+        if file_type.is_dir() {
+            if recursive {
+                collect_media_files(&file_path, recursive, items)?;
+            }
+            continue;
+        }
+
+        if !file_type.is_file() {
+            continue;
+        }
+
+        let extension = file_path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| ext.to_ascii_lowercase())
+            .unwrap_or_default();
+
+        let kind = if VIDEO_EXTENSIONS.contains(&extension.as_str()) {
+            "video"
+        } else if AUDIO_EXTENSIONS.contains(&extension.as_str()) {
+            "audio"
+        } else {
+            continue;
+        };
+
+        let Ok(file_metadata) = entry.metadata() else {
+            continue;
+        };
+
+        let name = file_path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or("média")
+            .to_string();
+
+        items.push(MediaFileInfo {
+            path: file_path.to_string_lossy().to_string(),
+            name,
+            kind: if kind == "video" { MediaKind::Video } else { MediaKind::Audio },
+            extension,
+            size: file_metadata.len(),
+        });
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
-fn load_media_folder(app: tauri::AppHandle, path: String) -> Result<Vec<MediaFileInfo>, String> {
+fn load_media_folder(
+    app: tauri::AppHandle,
+    path: String,
+    recursive: bool,
+) -> Result<Vec<MediaFileInfo>, String> {
     let directory = Path::new(&path);
     if !app.asset_protocol_scope().is_allowed(directory) {
         return Err("Le dossier doit être choisi dans le sélecteur de dossiers.".into());
     }
 
-    media_folder_info(directory)
+    let mut items: Vec<MediaFileInfo> = Vec::new();
+    collect_media_files(directory, recursive, &mut items)
+        .map_err(|_| format!("Impossible de lire le contenu du dossier : {path}"))?;
+
+    items.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(items)
 }
 
 #[tauri::command]

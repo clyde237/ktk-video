@@ -186,12 +186,30 @@ export function addToPlaylist(item: MediaItem): void {
   });
 }
 
-export function addManyToPlaylist(items: MediaItem[]): void {
-  if (items.length === 0) return;
+export function addManyToPlaylist(items: MediaItem[]): { added: number; skipped: number } {
+  if (items.length === 0) return { added: 0, skipped: 0 };
+
+  let added = 0;
+  let skipped = 0;
+
   updateActivePlaylist((playlist) => {
-    playlist.items.push(...items);
-    return true;
+    const known = new Set(playlist.items.map((existing) => existing.path));
+
+    for (const item of items) {
+      if (known.has(item.path)) {
+        skipped += 1;
+        continue;
+      }
+
+      playlist.items.push(item);
+      known.add(item.path);
+      added += 1;
+    }
+
+    return added > 0 || skipped > 0;
   });
+
+  return { added, skipped };
 }
 
 export function removeFromPlaylist(itemId: string): void {

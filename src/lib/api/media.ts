@@ -29,20 +29,27 @@ function toMediaItem(info: MediaFileInfo): MediaItem {
   };
 }
 
-export async function openMediaFile(): Promise<MediaItem | null> {
+export async function openMediaFiles(): Promise<MediaItem[] | null> {
   const selection = await open({
-    multiple: false,
-    title: "Ouvrir un média",
+    multiple: true,
+    title: "Importer des médias",
     filters: MEDIA_FILTERS,
   });
 
-  if (typeof selection !== "string") return null;
+  if (selection === null) return null;
 
-  const info = await invoke<MediaFileInfo>("load_media_file", { path: selection });
-  return toMediaItem(info);
+  const paths = Array.isArray(selection) ? selection : [selection];
+  const infos = await Promise.all(
+    paths.map(async (path) => {
+      const info = await invoke<MediaFileInfo>("load_media_file", { path });
+      return toMediaItem(info);
+    }),
+  );
+
+  return infos.filter((item) => item.path.length > 0);
 }
 
-export async function openMediaFolder(): Promise<MediaItem[] | null> {
+export async function openMediaFolder(recursive = true): Promise<MediaItem[] | null> {
   const selection = await open({
     multiple: false,
     directory: true,
@@ -51,7 +58,10 @@ export async function openMediaFolder(): Promise<MediaItem[] | null> {
 
   if (typeof selection !== "string") return null;
 
-  const infos = await invoke<MediaFileInfo[]>("load_media_folder", { path: selection });
+  const infos = await invoke<MediaFileInfo[]>("load_media_folder", {
+    path: selection,
+    recursive,
+  });
   return infos.map(toMediaItem);
 }
 
