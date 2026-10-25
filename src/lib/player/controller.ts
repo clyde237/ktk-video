@@ -144,17 +144,47 @@ export function changePlaybackRate(rate: number): void {
   }
 }
 
-function handleEnded(): void {
+export function seekBy(delta: number): void {
+  if (!Number.isFinite(delta)) return;
+  seekTo(get(position) + delta);
+}
+
+export function changeVolumeBy(delta: number): void {
+  if (!Number.isFinite(delta)) return;
+  changeVolume(get(volume) + delta);
+}
+
+export function playNext(): boolean {
   const current = get(currentMedia);
-  if (!current) return;
+  if (!current) return false;
 
   const playlist = get(activePlaylist);
-  if (!playlist) return;
-
+  if (!playlist) return false;
   const index = playlist.items.findIndex((item) => item.id === current.id);
-  if (index < 0) return;
+  if (index < 0) return false;
+
   const next = playlist.items[index + 1];
-  if (next) loadMedia(next);
+  if (!next) return false;
+
+  loadMedia(next);
+  return true;
+}
+
+export function playPrevious(): boolean {
+  const current = get(currentMedia);
+  if (!current) return false;
+
+  const playlist = get(activePlaylist);
+  if (!playlist) return false;
+  const index = playlist.items.findIndex((item) => item.id === current.id);
+  if (index <= 0) return false;
+
+  loadMedia(playlist.items[index - 1]);
+  return true;
+}
+
+function handleEnded(): void {
+  playNext();
 }
 
 async function handlePlaybackError(): Promise<void> {

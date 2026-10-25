@@ -16,10 +16,10 @@
 > Distribution : le binaire FFmpeg téléchargé inclut des composants GPL (dont libx264) ; vérifier les obligations de licence avant tout packaging public.
 
 ## Phase 3 : Interface Utilisateur
-- [ ] Créer les composants Svelte pour les contrôles de lecture (barre de progression, boutons play/pause, volume, vitesse de lecture)
-- [ ] Implémenter la gestion des raccourcis clavier pour toutes les actions courantes du lecteur
-- [ ] Développer le basculement thème clair/sombre en fonction des préférences du système d'exploitation
-- [ ] Construire la fenêtre de lecteur principale avec disparition automatique des contrôles pendant la lecture
+- [x] Créer les composants Svelte pour les contrôles de lecture (barre de progression, boutons play/pause, volume, vitesse de lecture)
+- [x] Implémenter la gestion des raccourcis clavier pour toutes les actions courantes du lecteur
+- [x] Développer le basculement thème clair/sombre en fonction des préférences du système d'exploitation
+- [x] Construire la fenêtre de lecteur principale avec disparition automatique des contrôles pendant la lecture
 
 ## Phase 4 : Fonctionnalités Avancées & Tests
 - [ ] Implémenter la gestion de playlists : création, édition, réordonnancement, persistance et chargement
