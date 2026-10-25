@@ -54,3 +54,11 @@ export async function openMediaFolder(): Promise<MediaItem[] | null> {
   const infos = await invoke<MediaFileInfo[]>("load_media_folder", { path: selection });
   return infos.map(toMediaItem);
 }
+
+export async function remuxMedia(path: string): Promise<string> {
+  return invoke<string>("remux_media", { path });
+}
+
+export async function transcodeMedia(path: string): Promise<string> {
+  return invoke<string>("transcode_media", { path });
+}

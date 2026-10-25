@@ -10,8 +10,10 @@
 ## Phase 2 : Backend & Moteur Métier
 - [x] Implémenter des commandes Tauri pour charger et ouvrir un fichier média individuel
 - [x] Développer la fonctionnalité de chargement de dossier et d'énumération des fichiers audio/video
-- [ ] Intégrer une bibliothèque de décodage média côté Rust (ex: rodio/cpal pour l'audio, ffmpeg pour la vidéo)
+- [x] Ajouter le repli FFmpeg au lecteur webview (remuxage et transcodage des médias non lus nativement)
 - [ ] Exposer les commandes de contrôle de lecture (play, pause, stop) via l'API Tauri
+
+> Distribution : le binaire FFmpeg téléchargé inclut des composants GPL (dont libx264) ; vérifier les obligations de licence avant tout packaging public.
 
 ## Phase 3 : Interface Utilisateur
 - [ ] Créer les composants Svelte pour les contrôles de lecture (barre de progression, boutons play/pause, volume, vitesse de lecture)

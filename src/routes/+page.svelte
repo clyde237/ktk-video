@@ -1,14 +1,28 @@
 <script lang="ts">
   import { convertFileSrc } from "@tauri-apps/api/core";
-  import { openMediaFile, openMediaFolder } from "$lib/api/media";
+  import { openMediaFile, openMediaFolder, remuxMedia, transcodeMedia } from "$lib/api/media";
   import { formatFileSize } from "$lib/utils/formatters";
   import { playerStore, setCurrentItem } from "$lib/stores/player";
   import { activePlaylist, addManyToPlaylist, clearPlaylist } from "$lib/stores/playlist";
   import type { MediaItem } from "$lib/types/media";
 
   let isLoading = $state(false);
+  let isConverting = $state(false);
   let errorMessage = $state<string | null>(null);
   let notice = $state<string | null>(null);
+  let fallbackPath = $state<string | null>(null);
+  let playbackStage = $state(0);
+  let playbackGeneration = 0;
+
+  function selectMedia(item: MediaItem): void {
+    playbackGeneration += 1;
+    fallbackPath = null;
+    playbackStage = 0;
+    isConverting = false;
+    errorMessage = null;
+    notice = null;
+    setCurrentItem(item);
+  }
 
   async function runImport(action: () => Promise<void>): Promise<void> {
     isLoading = true;
@@ -27,7 +41,7 @@
   function handleOpenFile(): Promise<void> {
     return runImport(async () => {
       const media = await openMediaFile();
-      if (media) setCurrentItem(media);
+      if (media) selectMedia(media);
     });
   }
 
@@ -47,12 +61,72 @@
   }
 
   function handlePlayItem(item: MediaItem): void {
-    setCurrentItem(item);
-    errorMessage = null;
+    selectMedia(item);
   }
 
-  function handlePlaybackError(): void {
-    errorMessage = "Ce format ou ce codec n'est pas pris en charge par la webview.";
+  async function handlePlaybackError(): Promise<void> {
+    const item = $playerStore.currentItem;
+    if (!item || isConverting || playbackStage >= 2) return;
+
+    const generation = playbackGeneration;
+    isConverting = true;
+    errorMessage = null;
+
+    try {
+      if (item.kind === "audio") {
+        notice = "Format audio incompatible : transcodage en cours (le premier lancement peut télécharger FFmpeg)…";
+        const convertedPath = await transcodeMedia(item.path);
+        if (generation !== playbackGeneration) return;
+        fallbackPath = convertedPath;
+        playbackStage = 2;
+        notice = "Audio converti pour la lecture.";
+        return;
+      }
+
+      if (playbackStage === 0) {
+        playbackStage = 1;
+        notice = "Format vidéo incompatible : remuxage en cours (le premier lancement peut télécharger FFmpeg)…";
+        try {
+          const remuxedPath = await remuxMedia(item.path);
+          if (generation !== playbackGeneration) return;
+          fallbackPath = remuxedPath;
+          notice = "Vidéo remuxée. Si la lecture échoue, un transcodage sera tenté.";
+          return;
+        } catch (remuxError: unknown) {
+          if (generation !== playbackGeneration) return;
+          notice = "Le remuxage a échoué ; transcodage en cours, cela peut prendre plusieurs minutes…";
+          try {
+            const transcodedPath = await transcodeMedia(item.path);
+            if (generation !== playbackGeneration) return;
+            fallbackPath = transcodedPath;
+            playbackStage = 2;
+            notice = "Vidéo transcodée pour la lecture.";
+          } catch (transcodeError: unknown) {
+            const remuxMessage = remuxError instanceof Error ? remuxError.message : String(remuxError);
+            const transcodeMessage =
+              transcodeError instanceof Error ? transcodeError.message : String(transcodeError);
+            throw new Error(
+              `Le remuxage a échoué (${remuxMessage}) et le transcodage aussi (${transcodeMessage}).`,
+            );
+          }
+        }
+        return;
+      }
+
+      notice = "La vidéo remuxée reste incompatible : transcodage en cours, cela peut prendre plusieurs minutes…";
+      const transcodedPath = await transcodeMedia(item.path);
+      if (generation !== playbackGeneration) return;
+      fallbackPath = transcodedPath;
+      playbackStage = 2;
+      notice = "Vidéo transcodée pour la lecture.";
+    } catch (error: unknown) {
+      if (generation === playbackGeneration) {
+        errorMessage = error instanceof Error ? error.message : String(error);
+        notice = null;
+      }
+    } finally {
+      if (generation === playbackGeneration) isConverting = false;
+    }
   }
 </script>
 
@@ -64,8 +138,8 @@
   <h1>ktk-video</h1>
 
   <div class="actions">
-    <button onclick={handleOpenFile} disabled={isLoading}>Ouvrir un média</button>
-    <button onclick={handleOpenFolder} disabled={isLoading}>Importer un dossier</button>
+    <button onclick={handleOpenFile} disabled={isLoading || isConverting}>Ouvrir un média</button>
+    <button onclick={handleOpenFolder} disabled={isLoading || isConverting}>Importer un dossier</button>
   </div>
 
   {#if notice}
@@ -78,15 +152,17 @@
 
   {#if $playerStore.currentItem}
     {@const currentItem = $playerStore.currentItem}
+    {@const playbackPath = fallbackPath ?? currentItem.path}
     <p class="media-info">
       {currentItem.name} — {currentItem.kind === "video" ? "vidéo" : "audio"}
       ({formatFileSize(currentItem.size)})
+      {#if playbackStage === 1} — version remuxée{:else if playbackStage === 2} — version convertie{/if}
     </p>
 
     {#if currentItem.kind === "video"}
       <!-- svelte-ignore a11y_media_has_caption -->
       <video
-        src={convertFileSrc(currentItem.path)}
+        src={convertFileSrc(playbackPath)}
         controls
         autoplay
         playsinline
@@ -94,7 +170,7 @@
       ></video>
     {:else}
       <audio
-        src={convertFileSrc(currentItem.path)}
+        src={convertFileSrc(playbackPath)}
         controls
         autoplay
         onerror={handlePlaybackError}
@@ -111,7 +187,7 @@
       <ul>
         {#each $activePlaylist.items as item (item.id)}
           <li>
-            <button class="item" onclick={() => handlePlayItem(item)}>
+            <button class="item" onclick={() => handlePlayItem(item)} disabled={isConverting}>
               <span class="name">{item.name}</span>
               <span class="meta">
                 {item.kind === "video" ? "vidéo" : "audio"} · {formatFileSize(item.size)}
