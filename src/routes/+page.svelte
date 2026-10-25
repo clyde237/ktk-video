@@ -1,37 +1,24 @@
 <script lang="ts">
+  import logo from "$lib/assets/logo-kv.png";
+  import ControlBar from "$lib/components/player/ControlBar.svelte";
+  import ProgressBar from "$lib/components/player/ProgressBar.svelte";
   import { openMediaFile, openMediaFolder } from "$lib/api/media";
-  import {
-    attachMediaElement,
-    changePlaybackRate,
-    changeVolume,
-    detachMediaElement,
-    loadMedia,
-    seekTo,
-    stop,
-    toggleMute,
-    togglePlay,
-  } from "$lib/player/controller";
+  import { attachMediaElement, detachMediaElement, loadMedia } from "$lib/player/controller";
+  import { activePlaylist, addManyToPlaylist, clearPlaylist } from "$lib/stores/playlist";
   import {
     currentMedia,
-    duration,
     isConverting,
-    isMuted,
-    isPlaying,
     playbackError,
     playbackNotice,
-    playbackRate,
     playbackSource,
     playbackStage,
-    position,
-    volume,
   } from "$lib/stores/player";
-  import { activePlaylist, addManyToPlaylist, clearPlaylist } from "$lib/stores/playlist";
-  import { formatDuration, formatFileSize } from "$lib/utils/formatters";
+  import { formatFileSize } from "$lib/utils/formatters";
   import type { MediaItem } from "$lib/types/media";
 
   let isLoading = $state(false);
-  let importError = $state<string | null>(null);
   let importNotice = $state<string | null>(null);
+  let importError = $state<string | null>(null);
   let mediaElement = $state<HTMLMediaElement | null>(null);
 
   $effect(() => {
@@ -41,8 +28,8 @@
 
   async function runImport(action: () => Promise<void>): Promise<void> {
     isLoading = true;
-    importError = null;
     importNotice = null;
+    importError = null;
 
     try {
       await action();
@@ -64,7 +51,6 @@
     return runImport(async () => {
       const items = await openMediaFolder();
       if (items === null) return;
-
       if (items.length === 0) {
         importNotice = "Aucun média trouvé dans ce dossier.";
         return;
@@ -78,116 +64,70 @@
   function handlePlayItem(item: MediaItem): void {
     loadMedia(item);
   }
-
-  function handleSeekInput(event: Event): void {
-    seekTo(Number((event.currentTarget as HTMLInputElement).value));
-  }
-
-  function handleVolumeInput(event: Event): void {
-    changeVolume(Number((event.currentTarget as HTMLInputElement).value));
-  }
-
-  function handleSpeedChange(event: Event): void {
-    changePlaybackRate(Number((event.currentTarget as HTMLSelectElement).value));
-  }
 </script>
 
 <svelte:head>
   <title>ktk-video</title>
+  <meta
+    name="description"
+    content="Lecteur vidéo et audio ktk-video"
+  />
 </svelte:head>
 
 <main>
-  <h1>ktk-video</h1>
+  <header class="app-header">
+    <img class="logo" src={logo} alt="Logo ktk-video" />
+    <h1>ktk-video</h1>
+  </header>
 
   <div class="actions">
-    <button onclick={handleOpenFile} disabled={isLoading || $isConverting}>Ouvrir un média</button>
-    <button onclick={handleOpenFolder} disabled={isLoading || $isConverting}>Importer un dossier</button>
+    <button onclick={handleOpenFile} disabled={isLoading || $isConverting}>
+      Ouvrir un média
+    </button>
+    <button onclick={handleOpenFolder} disabled={isLoading || $isConverting}>
+      Importer un dossier
+    </button>
   </div>
 
   {#if importNotice}
     <p class="notice" role="status">{importNotice}</p>
   {/if}
-
   {#if importError}
     <p class="error" role="alert">{importError}</p>
   {/if}
 
   {#if $currentMedia}
-    {@const currentItem = $currentMedia}
-    <p class="media-info">
-      {currentItem.name} — {currentItem.kind === "video" ? "vidéo" : "audio"}
-      ({formatFileSize(currentItem.size)})
-      {#if $playbackStage === 1} — version remuxée{:else if $playbackStage === 2} — version convertie{/if}
-    </p>
+    <section class="player" aria-label="Lecteur multimédia">
+      <p class="media-title">
+        {$currentMedia.name} — {$currentMedia.kind === "video" ? "vidéo" : "audio"}
+        ({formatFileSize($currentMedia.size)})
+        {#if $playbackStage === 1}(remuxé){:else if $playbackStage === 2}(converti){/if}
+      </p>
 
-    {#if currentItem.kind === "video"}
-      <!-- svelte-ignore a11y_media_has_caption -->
-      <video
-        bind:this={mediaElement}
-        src={$playbackSource}
-        controls
-        autoplay
-        playsinline
-      ></video>
-    {:else}
-      <audio
-        bind:this={mediaElement}
-        src={$playbackSource}
-        controls
-        autoplay
-      ></audio>
-    {/if}
+      {#if $currentMedia.kind === "video"}
+        <!-- svelte-ignore a11y_media_has_caption -->
+        <video bind:this={mediaElement} src={$playbackSource} autoplay playsinline></video>
+      {:else}
+        <audio bind:this={mediaElement} src={$playbackSource} autoplay></audio>
+      {/if}
 
-    <div class="controls">
-      <button onclick={togglePlay} disabled={$isConverting}>
-        {#if $isPlaying}Pause{:else}Lecture{/if}
-      </button>
-      <button onclick={stop} disabled={$isConverting}>Stop</button>
-      <span>{formatDuration($position)} / {formatDuration($duration)}</span>
-      <input
-        aria-label="Position de lecture"
-        type="range"
-        min="0"
-        max={Math.max($duration, 0)}
-        step="0.1"
-        value={Math.min($position, $duration)}
-        oninput={handleSeekInput}
-        disabled={!$duration || $isConverting}
-      />
-      <label>
-        Volume
-        <input
-          aria-label="Volume"
-          type="range"
-          min="0"
-          max="1"
-          step="0.05"
-          value={$volume}
-          oninput={handleVolumeInput}
-        />
-      </label>
-      <button onclick={toggleMute}>{#if $isMuted}Rétablir{:else}Muet{/if}</button>
-      <label>
-        Vitesse
-        <select value={$playbackRate} onchange={handleSpeedChange}>
-          <option value="0.25">0,25×</option>
-          <option value="0.5">0,5×</option>
-          <option value="1">1×</option>
-          <option value="1.5">1,5×</option>
-          <option value="2">2×</option>
-        </select>
-      </label>
-    </div>
+      <div class="player-controls">
+        <ProgressBar />
+        <ControlBar />
+      </div>
 
-    {#if $isConverting}
-      <p class="notice" role="status">Préparation du média…</p>
-    {/if}
-    {#if $playbackNotice}
-      <p class="notice" role="status">{$playbackNotice}</p>
-    {/if}
-    {#if $playbackError}
-      <p class="error" role="alert">{$playbackError}</p>
-    {/if}
+      {#if $isConverting}
+        <p class="notice" role="status">Préparation du média…</p>
+      {/if}
+      {#if $playbackNotice}
+        <p class="notice" role="status">{$playbackNotice}</p>
+      {/if}
+      {#if $playbackError}
+        <p class="error" role="alert">{$playbackError}</p>
+      {/if}
+    </section>
+  {:else}
+    <p class="empty">Sélectionne un fichier ou un dossier pour commencer.</p>
   {/if}
 
   {#if $activePlaylist && $activePlaylist.items.length > 0}
@@ -199,7 +139,12 @@
       <ul>
         {#each $activePlaylist.items as item (item.id)}
           <li>
-            <button class="item" onclick={() => handlePlayItem(item)} disabled={$isConverting}>
+            <button
+              class="item"
+              class:active={item.id === $currentMedia?.id}
+              onclick={() => handlePlayItem(item)}
+              disabled={$isConverting}
+            >
               <span class="name">{item.name}</span>
               <span class="meta">
                 {item.kind === "video" ? "vidéo" : "audio"} · {formatFileSize(item.size)}
@@ -214,70 +159,113 @@
 
 <style>
   main {
-    max-width: 720px;
+    max-width: 920px;
     margin: 0 auto;
-    padding: 2rem;
+    padding: 1.5rem 2rem 3rem;
     text-align: center;
+  }
+
+  .app-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .logo {
+    width: 42px;
+    height: 42px;
+    object-fit: contain;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
   }
 
   .actions {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 0.5rem;
+    gap: 0.6rem;
   }
 
   button {
-    padding: 0.6rem 1.2rem;
-    font-size: 1rem;
+    padding: 0.55rem 1.15rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    background: var(--color-surface);
+    font-size: 0.95rem;
     cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  button:hover:not(:disabled) {
+    background: var(--color-surface-hover);
   }
 
   button:disabled {
-    cursor: wait;
+    opacity: 0.5;
+    cursor: default;
   }
 
-  video {
+  .player video {
+    width: 100%;
+    max-height: min(65vh, 720px);
+    margin-top: 1rem;
+    border-radius: var(--radius-sm);
+    background: #000;
+    object-fit: contain;
+  }
+
+  .player audio {
     width: 100%;
     margin-top: 1rem;
-    background: black;
-    border-radius: 8px;
   }
 
-  audio {
-    width: 100%;
-    margin-top: 1rem;
+  .player-controls {
+    display: grid;
+    gap: 0.4rem;
+    margin-top: 0.9rem;
+    padding: 0 0.4rem;
   }
 
-  .controls {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    margin-top: 0.75rem;
-  }
-
-  .controls label {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    font-size: 0.9rem;
-  }
-
-  .media-info {
+  .media-title {
+    margin-top: 1.5rem;
+    color: var(--color-text-muted);
+    font-size: 0.95rem;
     overflow-wrap: anywhere;
   }
 
+  .empty {
+    margin-top: 3rem;
+    color: var(--color-text-muted);
+  }
+
   .playlist {
-    margin-top: 2rem;
+    margin-top: 2.25rem;
     text-align: left;
   }
 
   .playlist header {
     display: flex;
-    justify-content: space-between;
     align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .playlist h2 {
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+
+  .ghost {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-text-muted);
+    text-decoration: underline;
   }
 
   .playlist ul {
@@ -288,37 +276,56 @@
 
   .item {
     display: flex;
-    justify-content: space-between;
     width: 100%;
-    padding: 0.5rem 0.75rem;
-    border: none;
-    border-radius: 6px;
-    background: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.55rem 0.85rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
     text-align: left;
   }
 
-  .item:hover {
-    background: #f0f0f0;
+  .item:hover:not(:disabled) {
+    background: var(--color-surface);
   }
 
-  .ghost {
-    padding: 0;
-    border: none;
-    background: none;
-    color: #666;
-    text-decoration: underline;
+  .item.active {
+    border-color: var(--color-border);
+    background: var(--color-surface);
+  }
+
+  .item.active .name {
+    font-weight: 600;
+  }
+
+  .name {
+    font-size: 0.95rem;
+    overflow-wrap: anywhere;
   }
 
   .meta {
     margin-left: 1rem;
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
     white-space: nowrap;
   }
 
   .notice {
-    color: #2563eb;
+    color: var(--color-accent);
   }
 
   .error {
-    color: #e11d48;
+    color: #f87171;
+  }
+
+  @media (max-width: 540px) {
+    main {
+      padding: 1rem 1rem 2rem;
+    }
+
+    .item {
+      gap: 0.75rem;
+    }
   }
 </style>
