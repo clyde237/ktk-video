@@ -11,7 +11,7 @@
 - [x] Implémenter des commandes Tauri pour charger et ouvrir un fichier média individuel
 - [x] Développer la fonctionnalité de chargement de dossier et d'énumération des fichiers audio/video
 - [x] Ajouter le repli FFmpeg au lecteur webview (remuxage et transcodage des médias non lus nativement)
-- [ ] Exposer les commandes de contrôle de lecture (play, pause, stop) via l'API Tauri
+- [x] Exposer les commandes de contrôle de lecture (play, pause, stop, position, volume et vitesse) via un contrôleur TypeScript synchronisé avec la webview
 
 > Distribution : le binaire FFmpeg téléchargé inclut des composants GPL (dont libx264) ; vérifier les obligations de licence avant tout packaging public.
 
