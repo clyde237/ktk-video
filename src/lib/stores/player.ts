@@ -27,8 +27,9 @@ export function setCurrentItem(item: MediaItem | null): void {
   playerStore.update((state) => ({
     ...state,
     currentItem: item,
-    duration: item?.duration ?? state.duration,
-    currentTime: item ? Math.min(state.currentTime, item.duration ?? state.currentTime) : 0,
+    isPlaying: false,
+    duration: item?.duration ?? 0,
+    currentTime: 0,
   }));
 }
 

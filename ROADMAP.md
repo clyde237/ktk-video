@@ -8,7 +8,7 @@
 - [x] Mettre en place la configuration Vite et SvelteKit pour le développement rapide itératif
 
 ## Phase 2 : Backend & Moteur Métier
-- [ ] Implémenter des commandes Tauri pour charger et ouvrir un fichier média individuel
+- [x] Implémenter des commandes Tauri pour charger et ouvrir un fichier média individuel
 - [ ] Développer la fonctionnalité de chargement de dossier et d'énumération des fichiers audio/video
 - [ ] Intégrer une bibliothèque de décodage média côté Rust (ex: rodio/cpal pour l'audio, ffmpeg pour la vidéo)
 - [ ] Exposer les commandes de contrôle de lecture (play, pause, stop) via l'API Tauri
