@@ -1,0 +1,97 @@
+name: Build & Release Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - "v*"
+  pull_request:
+
+jobs:
+  test:
+    name: Tests unitaires (Frontend & Backend)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Configuration de Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Installation des dépendances système Linux
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Installation des dépendances Node
+        run: npm ci
+
+      - name: Vérification des types Svelte & TypeScript
+        run: npm run check
+
+      - name: Exécution des tests unitaires Frontend (Vitest)
+        run: npm test
+
+      - name: Exécution des tests unitaires Backend (Cargo)
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  build:
+    name: Build Multi-OS (${{ matrix.platform }})
+    needs: test
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "linux-x86_64"
+            os: ubuntu-22.04
+            target: deb,appimage
+          - platform: "windows-x86_64"
+            os: windows-latest
+            target: nsis,msi
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Configuration de Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Installation de Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache des dépendances Cargo
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Installation des dépendances système Linux
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Installation des dépendances Node
+        run: npm ci
+
+      - name: Build Tauri de l'application
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: "ktk-video v__VERSION__"
+          releaseBody: "Consultez les notes de version pour les détails des changements."
+          releaseDraft: true
+          prerelease: false
+          args: --bundles ${{ matrix.target }}

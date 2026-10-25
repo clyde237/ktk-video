@@ -23,4 +23,4 @@
 - [x] Implémenter la gestion de playlists : création, édition, réordonnancement, persistance et chargement
 - [x] Ajouter les import de fichiers et de dossiers complets vers la bibliothèque du lecteur
 - [x] Intégrer le support des sous-titres embarqués et fichiers .srt externes avec affichage synchronisé
-- [ ] Écrire des tests unitaires et d'intégration pour les chemins de lecture et de contrôle, finaliser la pipeline npm run tauri build multi-os (linux, windows) - (deb, appimage, exe, msi)
+- [x] Écrire des tests unitaires et d'intégration pour les chemins de lecture et de contrôle, finaliser la pipeline npm run tauri build multi-os (linux, windows) - (deb, appimage, exe, msi)

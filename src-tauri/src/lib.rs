@@ -663,8 +663,8 @@ mod tests {
     };
 
     use super::{
-        ConversionMode, MediaKind, media_file_info, media_folder_info, output_extension,
-        output_path, run_conversion,
+        collect_media_files, find_subtitles, output_extension, output_path, run_conversion,
+        ConversionMode, MediaKind, media_file_info,
     };
 
     fn test_directory() -> std::path::PathBuf {
@@ -719,7 +719,7 @@ mod tests {
     }
 
     #[test]
-    fn loads_only_direct_media_files_and_sorts_by_name() {
+    fn loads_direct_or_recursive_media_files() {
         let directory = test_directory();
         fs::create_dir(&directory).expect("test directory should be created");
 
@@ -732,29 +732,45 @@ mod tests {
         fs::create_dir(&nested).expect("nested directory should be created");
         fs::write(nested.join("nested.mp4"), b"video").expect("nested media should be created");
 
-        let items = media_folder_info(&directory).expect("media folder should load");
+        let mut direct_items = Vec::new();
+        collect_media_files(&directory, false, &mut direct_items).expect("direct scan should succeed");
+        direct_items.sort_by_cached_key(|item| (item.name.to_lowercase(), item.name.clone()));
 
-        assert_eq!(items.len(), 2);
-        assert_eq!(items[0].name, "alpha");
-        assert_eq!(items[1].name, "Zulu");
+        assert_eq!(direct_items.len(), 2);
+        assert_eq!(direct_items[0].name, "alpha");
+        assert_eq!(direct_items[1].name, "Zulu");
+
+        let mut recursive_items = Vec::new();
+        collect_media_files(&directory, true, &mut recursive_items).expect("recursive scan should succeed");
+        assert_eq!(recursive_items.len(), 3);
 
         fs::remove_dir_all(directory).expect("test directory should be removed");
     }
 
     #[test]
-    fn returns_empty_for_media_free_folder_and_rejects_file_path() {
+    fn finds_subtitles_sorted_by_relevance() {
         let directory = test_directory();
         fs::create_dir(&directory).expect("test directory should be created");
-        assert!(
-            media_folder_info(&directory)
-                .expect("empty media folder should load")
-                .is_empty()
-        );
 
-        let file = directory.join("file.mp4");
-        fs::write(&file, b"video").expect("test file should be created");
+        let video = directory.join("film.mkv");
+        fs::write(&video, b"video").expect("video should be created");
+        fs::write(directory.join("film.srt"), b"sub").expect("sub should be created");
+        fs::write(directory.join("film.fr.srt"), b"sub").expect("sub should be created");
+        fs::write(directory.join("autre.srt"), b"sub").expect("sub should be created");
+        fs::write(directory.join("ignore.txt"), b"text").expect("txt should be created");
 
-        assert!(media_folder_info(&file).is_err());
+        let found = find_subtitles(video.to_string_lossy().to_string());
+        assert_eq!(found.len(), 3);
+
+        let names: Vec<String> = found
+            .iter()
+            .map(|p| std::path::Path::new(p).file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+
+        // Exact ("film.srt") en premier, puis préfixe ("film.fr.srt"), puis autres ("autre.srt")
+        assert_eq!(names[0], "film.srt");
+        assert_eq!(names[1], "film.fr.srt");
+        assert_eq!(names[2], "autre.srt");
 
         fs::remove_dir_all(directory).expect("test directory should be removed");
     }
