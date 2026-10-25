@@ -91,45 +91,6 @@ fn load_media_file(app: tauri::AppHandle, path: String) -> Result<MediaFileInfo,
     media_file_info(Path::new(&path))
 }
 
-fn media_folder_info(directory: &Path) -> Result<Vec<MediaFileInfo>, String> {
-    let metadata = fs::metadata(directory).map_err(|error| {
-        format!(
-            "Impossible d'accéder au dossier {} : {error}",
-            directory.display()
-        )
-    })?;
-
-    if !metadata.is_dir() {
-        return Err("Le chemin indiqué n'est pas un dossier.".into());
-    }
-
-    let entries = fs::read_dir(directory).map_err(|error| {
-        format!(
-            "Impossible de lire le contenu du dossier {} : {error}",
-            directory.display()
-        )
-    })?;
-    let mut items: Vec<MediaFileInfo> = Vec::new();
-
-    for entry in entries {
-        let Ok(entry) = entry else {
-            continue;
-        };
-        let file_path = entry.path();
-
-        if !file_path.is_file() {
-            continue;
-        }
-
-        if let Ok(media) = media_file_info(&file_path) {
-            items.push(media);
-        }
-    }
-
-    items.sort_by_cached_key(|item| (item.name.to_lowercase(), item.name.clone()));
-    Ok(items)
-}
-
 fn collect_media_files(
     dir: &Path,
     recursive: bool,
@@ -237,6 +198,130 @@ fn load_playlists(app: tauri::AppHandle) -> Result<Option<String>, String> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(format!("Lecture des playlists impossible : {error}")),
     }
+}
+
+fn cache_output_path(extension: &str) -> Result<String, String> {
+    let directory = std::env::temp_dir().join("ktk-video-subtitles");
+    fs::create_dir_all(&directory).map_err(|error| {
+        format!("Impossible de créer le dossier de sous-titres temporaire : {error}")
+    })?;
+
+    let path = directory.join(format!("{}.{extension}", uuid::Uuid::new_v4()));
+    Ok(path.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn find_subtitles(video_path: String) -> Vec<String> {
+    let video = Path::new(&video_path);
+    let Some(dir) = video.parent() else {
+        return Vec::new();
+    };
+
+    let stem = video
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or_default()
+        .to_lowercase();
+
+    let mut exact = Vec::new();
+    let mut prefix = Vec::new();
+    let mut others = Vec::new();
+
+    let Ok(entries) = fs::read_dir(dir) else {
+        return Vec::new();
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let is_srt = path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .map(|extension| extension.eq_ignore_ascii_case("srt"))
+            .unwrap_or(false);
+        if !is_srt {
+            continue;
+        }
+
+        let candidate_stem = path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or_default()
+            .to_lowercase();
+        let full = path.to_string_lossy().to_string();
+
+        if candidate_stem == stem {
+            exact.push(full);
+        } else if candidate_stem.starts_with(&format!("{stem}.")) {
+            prefix.push(full);
+        } else {
+            others.push(full);
+        }
+    }
+
+    exact.sort();
+    prefix.sort();
+    others.sort();
+    exact.extend(prefix);
+    exact.extend(others);
+    exact
+}
+
+#[tauri::command]
+fn extract_embedded_subtitle(path: String) -> Result<String, String> {
+    if !Path::new(&path).is_file() {
+        return Err("Fichier source introuvable.".into());
+    }
+
+    let output = cache_output_path("srt")?;
+    let ffmpeg_directory = std::env::temp_dir().join("ktk-video-ffmpeg");
+    let executable = ffmpeg_executable(&ffmpeg_directory)?;
+    let result = Command::new(executable)
+        .args([
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            &path,
+            "-map",
+            "0:s:0",
+            &output,
+        ])
+        .output()
+        .map_err(|error| format!("Impossible de démarrer FFmpeg : {error}"))?;
+
+    if !result.status.success() {
+        let cleanup_error = fs::remove_file(&output).err();
+        let message = String::from_utf8_lossy(&result.stderr).trim().to_string();
+        return Err(match cleanup_error {
+            Some(cleanup_error) if cleanup_error.kind() != std::io::ErrorKind::NotFound => format!(
+                "Aucune piste de sous-titres texte extractible. Impossible de nettoyer le fichier temporaire : {cleanup_error}"
+            ),
+            _ if !message.is_empty() => format!("Aucune piste de sous-titres texte extractible : {message}"),
+            _ => "Aucune piste de sous-titres texte extractible.".to_string(),
+        });
+    }
+
+    Ok(output)
+}
+
+#[tauri::command]
+fn read_text_file(path: String) -> Result<String, String> {
+    const MAX_BYTES: u64 = 5 * 1024 * 1024;
+
+    let file = Path::new(&path);
+    if !file.is_file() {
+        return Err("Fichier introuvable.".into());
+    }
+
+    let size = fs::metadata(file)
+        .map_err(|error| format!("Accès impossible : {error}"))?
+        .len();
+    if size > MAX_BYTES {
+        return Err("Fichier trop volumineux (5 Mo maximum pour des sous-titres).".into());
+    }
+
+    fs::read_to_string(file).map_err(|error| format!("Lecture impossible : {error}"))
 }
 
 fn output_extension(kind: &MediaKind, mode: ConversionMode) -> Result<&'static str, String> {
@@ -367,6 +452,7 @@ fn run_conversion(
                 "0:a:0?",
                 "-c",
                 "copy",
+                "-sn",
                 "-movflags",
                 "+faststart",
             ]);
@@ -387,6 +473,7 @@ fn run_conversion(
                 "aac",
                 "-b:a",
                 "192k",
+                "-sn",
                 "-movflags",
                 "+faststart",
             ]);
@@ -545,7 +632,10 @@ pub fn run() {
             remux_media,
             transcode_media,
             save_playlists,
-            load_playlists
+            load_playlists,
+            find_subtitles,
+            extract_embedded_subtitle,
+            read_text_file
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

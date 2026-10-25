@@ -20,7 +20,7 @@
 - [x] Construire la fenêtre de lecteur principale avec disparition automatique des contrôles pendant la lecture
 
 ## Phase 4 : Fonctionnalités Avancées & Tests
-- [ ] Implémenter la gestion de playlists : création, édition, réordonnancement, persistance et chargement
-- [ ] Ajouter les import de fichiers et de dossiers complets vers la bibliothèque du lecteur
-- [ ] Intégrer le support des sous-titres embarqués et fichiers .srt externes avec affichage synchronisé
+- [x] Implémenter la gestion de playlists : création, édition, réordonnancement, persistance et chargement
+- [x] Ajouter les import de fichiers et de dossiers complets vers la bibliothèque du lecteur
+- [x] Intégrer le support des sous-titres embarqués et fichiers .srt externes avec affichage synchronisé
 - [ ] Écrire des tests unitaires et d'intégration pour les chemins de lecture et de contrôle, finaliser la pipeline npm run tauri build multi-os (linux, windows) - (deb, appimage, exe, msi)
