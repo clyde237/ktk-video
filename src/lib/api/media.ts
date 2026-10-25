@@ -11,22 +11,14 @@ interface MediaFileInfo {
   size: number;
 }
 
-export async function openMediaFile(): Promise<MediaItem | null> {
-  const selection = await open({
-    multiple: false,
-    title: "Ouvrir un média",
-    filters: [
-      {
-        name: "Médias (vidéo et audio)",
-        extensions: [...VIDEO_EXTENSIONS, ...AUDIO_EXTENSIONS],
-      },
-    ],
-  });
+const MEDIA_FILTERS = [
+  {
+    name: "Médias (vidéo et audio)",
+    extensions: [...VIDEO_EXTENSIONS, ...AUDIO_EXTENSIONS],
+  },
+];
 
-  if (typeof selection !== "string") return null;
-
-  const info = await invoke<MediaFileInfo>("load_media_file", { path: selection });
-
+function toMediaItem(info: MediaFileInfo): MediaItem {
   return {
     id: crypto.randomUUID(),
     path: info.path,
@@ -35,4 +27,30 @@ export async function openMediaFile(): Promise<MediaItem | null> {
     extension: info.extension,
     size: info.size,
   };
+}
+
+export async function openMediaFile(): Promise<MediaItem | null> {
+  const selection = await open({
+    multiple: false,
+    title: "Ouvrir un média",
+    filters: MEDIA_FILTERS,
+  });
+
+  if (typeof selection !== "string") return null;
+
+  const info = await invoke<MediaFileInfo>("load_media_file", { path: selection });
+  return toMediaItem(info);
+}
+
+export async function openMediaFolder(): Promise<MediaItem[] | null> {
+  const selection = await open({
+    multiple: false,
+    directory: true,
+    title: "Importer un dossier de médias",
+  });
+
+  if (typeof selection !== "string") return null;
+
+  const infos = await invoke<MediaFileInfo[]>("load_media_folder", { path: selection });
+  return infos.map(toMediaItem);
 }

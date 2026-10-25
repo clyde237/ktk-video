@@ -1,6 +1,7 @@
 use std::{fs, path::Path};
 
 use serde::Serialize;
+use tauri::Manager;
 
 #[derive(Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -25,11 +26,13 @@ const AUDIO_EXTENSIONS: &[&str] = &[
     "mp3", "flac", "ogg", "oga", "wav", "m4a", "aac", "opus", "wma", "aiff",
 ];
 
-#[tauri::command]
-fn load_media_file(path: String) -> Result<MediaFileInfo, String> {
-    let file_path = Path::new(&path);
-    let metadata = fs::metadata(file_path)
-        .map_err(|error| format!("Impossible d'accéder au fichier : {error}"))?;
+fn media_file_info(file_path: &Path) -> Result<MediaFileInfo, String> {
+    let metadata = fs::metadata(file_path).map_err(|error| {
+        format!(
+            "Impossible d'accéder au fichier {} : {error}",
+            file_path.display()
+        )
+    })?;
 
     if !metadata.is_file() {
         return Err("Le chemin indiqué n'est pas un fichier.".into());
@@ -56,7 +59,7 @@ fn load_media_file(path: String) -> Result<MediaFileInfo, String> {
         .to_string();
 
     Ok(MediaFileInfo {
-        path,
+        path: file_path.to_string_lossy().into_owned(),
         name,
         kind,
         extension,
@@ -64,12 +67,70 @@ fn load_media_file(path: String) -> Result<MediaFileInfo, String> {
     })
 }
 
+#[tauri::command]
+fn load_media_file(app: tauri::AppHandle, path: String) -> Result<MediaFileInfo, String> {
+    if !app.asset_protocol_scope().is_allowed(&path) {
+        return Err("Le fichier doit être choisi dans le sélecteur de fichiers.".into());
+    }
+
+    media_file_info(Path::new(&path))
+}
+
+fn media_folder_info(directory: &Path) -> Result<Vec<MediaFileInfo>, String> {
+    let metadata = fs::metadata(directory).map_err(|error| {
+        format!(
+            "Impossible d'accéder au dossier {} : {error}",
+            directory.display()
+        )
+    })?;
+
+    if !metadata.is_dir() {
+        return Err("Le chemin indiqué n'est pas un dossier.".into());
+    }
+
+    let entries = fs::read_dir(directory).map_err(|error| {
+        format!(
+            "Impossible de lire le contenu du dossier {} : {error}",
+            directory.display()
+        )
+    })?;
+    let mut items: Vec<MediaFileInfo> = Vec::new();
+
+    for entry in entries {
+        let Ok(entry) = entry else {
+            continue;
+        };
+        let file_path = entry.path();
+
+        if !file_path.is_file() {
+            continue;
+        }
+
+        if let Ok(media) = media_file_info(&file_path) {
+            items.push(media);
+        }
+    }
+
+    items.sort_by_cached_key(|item| (item.name.to_lowercase(), item.name.clone()));
+    Ok(items)
+}
+
+#[tauri::command]
+fn load_media_folder(app: tauri::AppHandle, path: String) -> Result<Vec<MediaFileInfo>, String> {
+    let directory = Path::new(&path);
+    if !app.asset_protocol_scope().is_allowed(directory) {
+        return Err("Le dossier doit être choisi dans le sélecteur de dossiers.".into());
+    }
+
+    media_folder_info(directory)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![load_media_file])
+        .invoke_handler(tauri::generate_handler![load_media_file, load_media_folder])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -81,7 +142,7 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
-    use super::load_media_file;
+    use super::{media_file_info, media_folder_info};
 
     fn test_directory() -> std::path::PathBuf {
         let unique = SystemTime::now()
@@ -100,8 +161,7 @@ mod tests {
         let path = directory.join("Example.MP4");
         fs::write(&path, b"video").expect("test media should be created");
 
-        let media = load_media_file(path.to_string_lossy().into_owned())
-            .expect("supported media should load");
+        let media = media_file_info(&path).expect("supported media should load");
 
         assert_eq!(media.name, "Example");
         assert!(matches!(media.kind, super::MediaKind::Video));
@@ -120,18 +180,58 @@ mod tests {
         let directory = test_directory();
         fs::create_dir(&directory).expect("test directory should be created");
 
-        assert!(load_media_file(directory.to_string_lossy().into_owned()).is_err());
+        assert!(media_file_info(&directory).is_err());
 
         let unsupported = directory.join("document.txt");
         fs::write(&unsupported, b"text").expect("test file should be created");
-        assert!(load_media_file(unsupported.to_string_lossy().into_owned()).is_err());
+        assert!(media_file_info(&unsupported).is_err());
 
         let audio = directory.join("track.FLAC");
         fs::write(&audio, b"audio").expect("test audio should be created");
-        let media = load_media_file(audio.to_string_lossy().into_owned())
-            .expect("supported audio should load");
+        let media = media_file_info(&audio).expect("supported audio should load");
         assert!(matches!(media.kind, super::MediaKind::Audio));
         assert_eq!(media.extension, "flac");
+
+        fs::remove_dir_all(directory).expect("test directory should be removed");
+    }
+
+    #[test]
+    fn loads_only_direct_media_files_and_sorts_by_name() {
+        let directory = test_directory();
+        fs::create_dir(&directory).expect("test directory should be created");
+
+        fs::write(directory.join("Zulu.MP4"), b"video").expect("video should be created");
+        fs::write(directory.join("alpha.mp3"), b"audio").expect("audio should be created");
+        fs::write(directory.join("cover.png"), b"image").expect("image should be created");
+        fs::write(directory.join("notes.txt"), b"text").expect("text file should be created");
+
+        let nested = directory.join("nested");
+        fs::create_dir(&nested).expect("nested directory should be created");
+        fs::write(nested.join("nested.mp4"), b"video").expect("nested media should be created");
+
+        let items = media_folder_info(&directory).expect("media folder should load");
+
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].name, "alpha");
+        assert_eq!(items[1].name, "Zulu");
+
+        fs::remove_dir_all(directory).expect("test directory should be removed");
+    }
+
+    #[test]
+    fn returns_empty_for_media_free_folder_and_rejects_file_path() {
+        let directory = test_directory();
+        fs::create_dir(&directory).expect("test directory should be created");
+        assert!(
+            media_folder_info(&directory)
+                .expect("empty media folder should load")
+                .is_empty()
+        );
+
+        let file = directory.join("file.mp4");
+        fs::write(&file, b"video").expect("test file should be created");
+
+        assert!(media_folder_info(&file).is_err());
 
         fs::remove_dir_all(directory).expect("test directory should be removed");
     }

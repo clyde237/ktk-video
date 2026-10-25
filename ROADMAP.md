@@ -9,7 +9,7 @@
 
 ## Phase 2 : Backend & Moteur Métier
 - [x] Implémenter des commandes Tauri pour charger et ouvrir un fichier média individuel
-- [ ] Développer la fonctionnalité de chargement de dossier et d'énumération des fichiers audio/video
+- [x] Développer la fonctionnalité de chargement de dossier et d'énumération des fichiers audio/video
 - [ ] Intégrer une bibliothèque de décodage média côté Rust (ex: rodio/cpal pour l'audio, ffmpeg pour la vidéo)
 - [ ] Exposer les commandes de contrôle de lecture (play, pause, stop) via l'API Tauri
 
