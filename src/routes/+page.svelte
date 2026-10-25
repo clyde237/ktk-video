@@ -110,12 +110,6 @@
 
   {#if $currentMedia}
     <section class="player" aria-label="Lecteur multimédia">
-      <p class="media-title">
-        {$currentMedia.name} — {$currentMedia.kind === "video" ? "vidéo" : "audio"}
-        ({formatFileSize($currentMedia.size)})
-        {#if $playbackStage === 1}(remuxé){:else if $playbackStage === 2}(converti){/if}
-      </p>
-
       <PlayerStage />
 
       <p class="kbd-hint">
@@ -134,7 +128,7 @@
 
 <style>
   main {
-    max-width: 920px;
+    max-width: 1040px;
     margin: 0 auto;
     padding: 1.5rem 2rem 3rem;
     text-align: center;
@@ -186,11 +180,8 @@
     cursor: default;
   }
 
-  .media-title {
+  .player {
     margin-top: 1.5rem;
-    color: var(--color-text-muted);
-    font-size: 0.95rem;
-    overflow-wrap: anywhere;
   }
 
   .kbd-hint {
