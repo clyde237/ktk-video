@@ -140,6 +140,34 @@ fn load_media_folder(app: tauri::AppHandle, path: String) -> Result<Vec<MediaFil
     media_folder_info(directory)
 }
 
+#[tauri::command]
+fn save_playlists(app: tauri::AppHandle, data: String) -> Result<(), String> {
+    let directory = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Chemin des données indisponible : {error}"))?;
+    fs::create_dir_all(&directory)
+        .map_err(|error| format!("Création du dossier impossible : {error}"))?;
+
+    fs::write(directory.join("playlists.json"), data)
+        .map_err(|error| format!("Écriture des playlists impossible : {error}"))
+}
+
+#[tauri::command]
+fn load_playlists(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    let directory = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Chemin des données indisponible : {error}"))?;
+    let file = directory.join("playlists.json");
+
+    match fs::read_to_string(file) {
+        Ok(data) => Ok(Some(data)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(format!("Lecture des playlists impossible : {error}")),
+    }
+}
+
 fn output_extension(kind: &MediaKind, mode: ConversionMode) -> Result<&'static str, String> {
     match (kind, mode) {
         (MediaKind::Video, ConversionMode::Remux | ConversionMode::Transcode) => Ok("mp4"),
@@ -444,7 +472,9 @@ pub fn run() {
             load_media_file,
             load_media_folder,
             remux_media,
-            transcode_media
+            transcode_media,
+            save_playlists,
+            load_playlists
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

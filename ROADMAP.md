@@ -10,10 +10,8 @@
 ## Phase 2 : Backend & Moteur Métier
 - [x] Implémenter des commandes Tauri pour charger et ouvrir un fichier média individuel
 - [x] Développer la fonctionnalité de chargement de dossier et d'énumération des fichiers audio/video
-- [x] Ajouter le repli FFmpeg au lecteur webview (remuxage et transcodage des médias non lus nativement)
-- [x] Exposer les commandes de contrôle de lecture (play, pause, stop, position, volume et vitesse) via un contrôleur TypeScript synchronisé avec la webview
-
-> Distribution : le binaire FFmpeg téléchargé inclut des composants GPL (dont libx264) ; vérifier les obligations de licence avant tout packaging public.
+- [x] Intégrer une bibliothèque de décodage média côté Rust (ex: rodio/cpal pour l'audio, ffmpeg pour la vidéo)
+- [x] Exposer les commandes de contrôle de lecture (play, pause, stop) via l'API Tauri
 
 ## Phase 3 : Interface Utilisateur
 - [x] Créer les composants Svelte pour les contrôles de lecture (barre de progression, boutons play/pause, volume, vitesse de lecture)
@@ -25,4 +23,4 @@
 - [ ] Implémenter la gestion de playlists : création, édition, réordonnancement, persistance et chargement
 - [ ] Ajouter les import de fichiers et de dossiers complets vers la bibliothèque du lecteur
 - [ ] Intégrer le support des sous-titres embarqués et fichiers .srt externes avec affichage synchronisé
-- [ ] Écrire des tests unitaires et d'intégration pour les chemins de lecture et de contrôle, finaliser la pipeline npm run tauri build
+- [ ] Écrire des tests unitaires et d'intégration pour les chemins de lecture et de contrôle, finaliser la pipeline npm run tauri build multi-os (linux, windows) - (deb, appimage, exe, msi)

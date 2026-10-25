@@ -1,19 +1,24 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import logo from "$lib/assets/logo-kv.png";
   import PlayerStage from "$lib/components/player/PlayerStage.svelte";
+  import PlaylistPanel from "$lib/components/playlist/PlaylistPanel.svelte";
   import { openMediaFile, openMediaFolder } from "$lib/api/media";
   import { loadMedia } from "$lib/player/controller";
   import { installKeyboardShortcuts } from "$lib/player/shortcuts";
-  import { activePlaylist, addManyToPlaylist, clearPlaylist } from "$lib/stores/playlist";
+  import { addManyToPlaylist, initPlaylistStore, playlistStoreReady } from "$lib/stores/playlist";
   import { currentMedia, isConverting, playbackStage } from "$lib/stores/player";
   import { formatFileSize } from "$lib/utils/formatters";
-  import type { MediaItem } from "$lib/types/media";
 
   let isLoading = $state(false);
   let importNotice = $state<string | null>(null);
   let importError = $state<string | null>(null);
 
   $effect(() => installKeyboardShortcuts());
+
+  onMount(() => {
+    void initPlaylistStore();
+  });
 
   async function runImport(action: () => Promise<void>): Promise<void> {
     isLoading = true;
@@ -50,9 +55,6 @@
     });
   }
 
-  function handlePlayItem(item: MediaItem): void {
-    loadMedia(item);
-  }
 </script>
 
 <svelte:head>
@@ -70,10 +72,10 @@
   </header>
 
   <div class="actions">
-    <button onclick={handleOpenFile} disabled={isLoading || $isConverting}>
+    <button onclick={handleOpenFile} disabled={isLoading || $isConverting || !$playlistStoreReady}>
       Ouvrir un média
     </button>
-    <button onclick={handleOpenFolder} disabled={isLoading || $isConverting}>
+    <button onclick={handleOpenFolder} disabled={isLoading || $isConverting || !$playlistStoreReady}>
       Importer un dossier
     </button>
   </div>
@@ -106,31 +108,7 @@
     <p class="empty">Sélectionne un fichier ou un dossier pour commencer.</p>
   {/if}
 
-  {#if $activePlaylist && $activePlaylist.items.length > 0}
-    <section class="playlist">
-      <header>
-        <h2>Playlist — {$activePlaylist.items.length}</h2>
-        <button class="ghost" onclick={clearPlaylist}>Vider</button>
-      </header>
-      <ul>
-        {#each $activePlaylist.items as item (item.id)}
-          <li>
-            <button
-              class="item"
-              class:active={item.id === $currentMedia?.id}
-              onclick={() => handlePlayItem(item)}
-              disabled={$isConverting}
-            >
-              <span class="name">{item.name}</span>
-              <span class="meta">
-                {item.kind === "video" ? "vidéo" : "audio"} · {formatFileSize(item.size)}
-              </span>
-            </button>
-          </li>
-        {/each}
-      </ul>
-    </section>
-  {/if}
+  <PlaylistPanel />
 </main>
 
 <style>
@@ -219,73 +197,6 @@
     color: var(--color-text-muted);
   }
 
-  .playlist {
-    margin-top: 2.25rem;
-    text-align: left;
-  }
-
-  .playlist header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-  }
-
-  .playlist h2 {
-    font-size: 1.05rem;
-    font-weight: 600;
-  }
-
-  .ghost {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--color-text-muted);
-    text-decoration: underline;
-  }
-
-  .playlist ul {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .item {
-    display: flex;
-    width: 100%;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.55rem 0.85rem;
-    border: 1px solid transparent;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    text-align: left;
-  }
-
-  .item:hover:not(:disabled) {
-    background: var(--color-surface);
-  }
-
-  .item.active {
-    border-color: var(--color-border);
-    background: var(--color-surface);
-  }
-
-  .item.active .name {
-    font-weight: 600;
-  }
-
-  .name {
-    font-size: 0.95rem;
-    overflow-wrap: anywhere;
-  }
-
-  .meta {
-    margin-left: 1rem;
-    color: var(--color-text-muted);
-    font-size: 0.85rem;
-    white-space: nowrap;
-  }
-
   .notice {
     color: var(--color-accent);
   }
@@ -299,8 +210,5 @@
       padding: 1rem 1rem 2rem;
     }
 
-    .item {
-      gap: 0.75rem;
-    }
   }
 </style>
