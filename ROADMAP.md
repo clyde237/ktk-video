@@ -6,7 +6,7 @@
 - [x] Initialiser la structure du projet avec les dossiers src/ (SvelteKit) et src-tauri/ (Rust)
 - [x] Installer et vérifier les dépendances Node.js, TypeScript et SvelteKit via npm install
 - [x] Configurer l'outil Rust stable et les dépendances système requises pour Tauri 2
-- [ ] Mettre en place la configuration Vite et SvelteKit pour le développement rapide itératif
+- [x] Mettre en place la configuration Vite et SvelteKit pour le développement rapide itératif
 
 ## Phase 2 : Backend & Moteur Métier
 - [ ] Implémenter des commandes Tauri pour charger et ouvrir un fichier média individuel
