@@ -1,6 +1,5 @@
 # Roadmap — ktk-video
 > ktk-video est un lecteur multimédia de bureau léger et moderne, construit avec Tauri 2, SvelteKit 2 et TypeScript, offrant lecture vidéo/audio, gestion de playlists et une interface épurée inspirée des principes GNOME.
-> Règle de publication : les pushes seront effectués uniquement lorsqu'une phase est terminée.
 
 ## Phase 1 : Socle & Configuration
 - [x] Initialiser la structure du projet avec les dossiers src/ (SvelteKit) et src-tauri/ (Rust)
