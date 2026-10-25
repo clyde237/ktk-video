@@ -346,7 +346,7 @@
   }
 
   .error {
-    color: #f87171;
+    color: var(--color-danger);
   }
 
   @media (max-width: 540px) {

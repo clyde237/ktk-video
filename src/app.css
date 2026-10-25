@@ -10,8 +10,23 @@
   --color-accent: #3b82f6;
   --color-accent-2: #8b5cf6;
   --gradient-accent: linear-gradient(90deg, var(--color-accent), var(--color-accent-2));
+  --color-danger: #f87171;
   --radius-sm: 8px;
   --radius-full: 999px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+
+    --color-bg: #f4f5fa;
+    --color-surface: #fff;
+    --color-surface-hover: #eceef4;
+    --color-border: rgb(15 17 23 / 10%);
+    --color-text: #1b1d27;
+    --color-text-muted: #5b6172;
+    --color-danger: #dc2626;
+  }
 }
 
 * {
